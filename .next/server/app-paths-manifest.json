@@ -1,4 +1,14 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/notifications/billing-failure/route": "app/api/notifications/billing-failure/route.js",
+  "/api/subscriptions/[userId]/route": "app/api/subscriptions/[userId]/route.js",
+  "/api/paypal/charge/route": "app/api/paypal/charge/route.js",
+  "/api/subscriptions/due/route": "app/api/subscriptions/due/route.js",
+  "/api/notifications/billing-success/route": "app/api/notifications/billing-success/route.js",
+  "/api/wallet/[userId]/route": "app/api/wallet/[userId]/route.js",
+  "/api/wallet/deduct/route": "app/api/wallet/deduct/route.js",
+  "/api/transactions/route": "app/api/transactions/route.js",
   "/api/billing/process/route": "app/api/billing/process/route.js",
-  "/page": "app/page.js"
+  "/page": "app/page.js",
+  "/billing/page": "app/billing/page.js"
 }
