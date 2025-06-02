@@ -8,5 +8,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .env
-dist/
+
 out/
+
+# Local Netlify folder
+.netlify
