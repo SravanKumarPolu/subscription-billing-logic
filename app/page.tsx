@@ -1,90 +1,199 @@
+"use client"
+
+import { useState } from "react"
+
+interface WalletData {
+  balance: number
+  currency: string
+}
+
+interface SubscriptionData {
+  amount: number
+  nextBillingDate: string
+  status: string
+  planId: string
+}
+
+interface BillingResult {
+  success: boolean
+  message?: string
+  results?: any[]
+  error?: string
+  totalProcessed?: number
+  successful?: number
+  failed?: number
+}
+
 export default function HomePage() {
+  const [wallet, setWallet] = useState<WalletData>({ balance: 25.5, currency: "USD" })
+  const [subscription, setSubscription] = useState<SubscriptionData>({
+    amount: 29.99,
+    nextBillingDate: "2024-02-01",
+    status: "active",
+    planId: "plan_premium",
+  })
+  const [loading, setLoading] = useState(false)
+  const [billingResult, setBillingResult] = useState<BillingResult | null>(null)
+
+  const getPaymentPreview = () => {
+    const subscriptionAmount = subscription.amount
+    const walletBalance = wallet.balance
+
+    if (walletBalance >= subscriptionAmount) {
+      return {
+        method: "Wallet Only",
+        walletAmount: subscriptionAmount,
+        paypalAmount: 0,
+      }
+    } else if (walletBalance > 0) {
+      return {
+        method: "Wallet + PayPal",
+        walletAmount: walletBalance,
+        paypalAmount: subscriptionAmount - walletBalance,
+      }
+    } else {
+      return {
+        method: "PayPal Only",
+        walletAmount: 0,
+        paypalAmount: subscriptionAmount,
+      }
+    }
+  }
+
+  const runBillingProcess = async () => {
+    try {
+      setLoading(true)
+      setBillingResult(null)
+
+      console.log("Starting billing process...")
+
+      const response = await fetch("/api/billing/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      const result = await response.json()
+      console.log("Billing result:", result)
+
+      setBillingResult(result)
+
+      if (result.success) {
+        const successfulTransactions = result.results?.filter((r: any) => r.status === "success") || []
+        if (successfulTransactions.length > 0) {
+          const transaction = successfulTransactions[0].transaction
+          if (transaction.walletAmount > 0) {
+            setWallet((prev) => ({
+              ...prev,
+              balance: Math.max(0, prev.balance - transaction.walletAmount),
+            }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error processing billing:", error)
+      setBillingResult({
+        success: false,
+        error: `Network error: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const paymentPreview = getPaymentPreview()
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Billing Dashboard</h1>
-          <button className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+          <h1 className="text-2xl font-bold text-gray-900">Billing Dashboard</h1>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
             Refresh
           </button>
         </div>
 
         {/* Top Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Wallet Balance */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Wallet Balance</h3>
+              <h3 className="text-sm font-medium text-gray-700">Wallet Balance</h3>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             </div>
-            <div className="text-3xl font-bold text-gray-900 mb-1">$25.50</div>
-            <div className="text-sm text-gray-500">Available credits</div>
+            <div className="text-2xl font-bold text-gray-900 mb-1">${wallet.balance.toFixed(2)}</div>
+            <p className="text-sm text-gray-500">Available credits</p>
           </div>
 
           {/* Next Billing */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Next Billing</h3>
+              <h3 className="text-sm font-medium text-gray-700">Next Billing</h3>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <div className="text-3xl font-bold text-gray-900 mb-1">01/02/2024</div>
-            <div className="text-sm text-gray-500">$29.99 due</div>
+            <div className="text-2xl font-bold text-gray-900 mb-1">01/02/2024</div>
+            <p className="text-sm text-gray-500">${subscription.amount.toFixed(2)} due</p>
           </div>
 
           {/* Subscription */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Subscription</h3>
+              <h3 className="text-sm font-medium text-gray-700">Subscription</h3>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
             <div className="mb-2">
-              <span className="inline-block bg-gray-900 text-white text-sm font-medium px-3 py-1 rounded-full">
-                active
+              <span className="inline-flex px-2 py-1 text-sm font-medium bg-gray-900 text-white rounded">
+                {subscription.status}
               </span>
             </div>
-            <div className="text-sm text-gray-500">plan_premium</div>
+            <p className="text-sm text-gray-500">{subscription.planId}</p>
           </div>
         </div>
 
-        {/* Next Payment Preview */}
+        {/* Payment Preview */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <div className="flex items-center mb-4">
-            <span className="text-xl font-bold text-gray-900 mr-2">$</span>
-            <h2 className="text-xl font-bold text-gray-900">Next Payment Preview</h2>
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">$ Next Payment Preview</h2>
+            <p className="text-sm text-gray-600">How your next subscription payment will be processed</p>
           </div>
-          <p className="text-gray-600 mb-6">How your next subscription payment will be processed</p>
-          
+
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="font-medium text-gray-900">Payment Method:</span>
-              <button className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-1 px-3 rounded-full transition duration-200">
-                Wallet + PayPal
-              </button>
+              <span className="inline-flex px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">
+                {paymentPreview.method}
+              </span>
             </div>
-            
-            <div className="space-y-3 pt-4">
+
+            {paymentPreview.walletAmount > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">From Wallet:</span>
-                <span className="font-medium text-gray-900">$25.50</span>
+                <span className="font-medium text-gray-900">${paymentPreview.walletAmount.toFixed(2)}</span>
               </div>
-              
+            )}
+
+            {paymentPreview.paypalAmount > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">From PayPal:</span>
-                <span className="font-medium text-gray-900">$4.49</span>
+                <span className="font-medium text-gray-900">${paymentPreview.paypalAmount.toFixed(2)}</span>
               </div>
-              
-              <hr className="my-3" />
-              
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span className="text-gray-900">Total:</span>
-                <span className="text-gray-900">$29.99</span>
+            )}
+
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold text-gray-900">Total:</span>
+                <span className="text-lg font-semibold text-gray-900">${subscription.amount.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -92,12 +201,61 @@ export default function HomePage() {
 
         {/* Test Billing Process */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Test Billing Process</h2>
-          <p className="text-gray-600 mb-6">Manually trigger the billing process for testing</p>
-          
-          <button className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg transition duration-200">
-            Run Billing Process
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Test Billing Process</h2>
+            <p className="text-sm text-gray-600">Manually trigger the billing process for testing</p>
+          </div>
+
+          <button
+            onClick={runBillingProcess}
+            disabled={loading}
+            className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Processing..." : "Run Billing Process"}
           </button>
+
+          {billingResult && (
+            <div className={`mt-4 p-4 rounded-lg border ${
+              billingResult.success 
+                ? "bg-green-50 border-green-200" 
+                : "bg-red-50 border-red-200"
+            }`}>
+              <div className="flex items-center space-x-2 mb-2">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  billingResult.success ? "bg-green-500" : "bg-red-500"
+                }`}>
+                  {billingResult.success ? (
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`font-medium ${
+                  billingResult.success ? "text-green-800" : "text-red-800"
+                }`}>
+                  {billingResult.success ? "Billing Successful" : "Billing Failed"}
+                </span>
+              </div>
+
+              <p className={`text-sm ${
+                billingResult.success ? "text-green-700" : "text-red-700"
+              }`}>
+                {billingResult.message || billingResult.error}
+              </p>
+
+              {billingResult.success && billingResult.totalProcessed && (
+                <div className="mt-2 text-sm text-green-700">
+                  <p>Total Processed: {billingResult.totalProcessed}</p>
+                  <p>Successful: {billingResult.successful}</p>
+                  <p>Failed: {billingResult.failed}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

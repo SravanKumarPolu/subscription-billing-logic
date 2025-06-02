@@ -1,10 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Wallet, CreditCard, Calendar, DollarSign, AlertCircle, CheckCircle } from "lucide-react"
 
 interface WalletData {
   balance: number
@@ -20,7 +16,7 @@ interface SubscriptionData {
 
 interface BillingResult {
   success: boolean
-  message: string
+  message?: string
   results?: any[]
   error?: string
   totalProcessed?: number
@@ -48,21 +44,18 @@ export default function BillingDashboard() {
         method: "Wallet Only",
         walletAmount: subscriptionAmount,
         paypalAmount: 0,
-        color: "bg-green-500",
       }
     } else if (walletBalance > 0) {
       return {
         method: "Wallet + PayPal",
         walletAmount: walletBalance,
         paypalAmount: subscriptionAmount - walletBalance,
-        color: "bg-blue-500",
       }
     } else {
       return {
         method: "PayPal Only",
         walletAmount: 0,
         paypalAmount: subscriptionAmount,
-        color: "bg-orange-500",
       }
     }
   }
@@ -87,10 +80,8 @@ export default function BillingDashboard() {
       setBillingResult(result)
 
       if (result.success) {
-        // Update wallet balance based on successful transactions
         const successfulTransactions = result.results?.filter((r: any) => r.status === "success") || []
         if (successfulTransactions.length > 0) {
-          // Simulate wallet balance update
           const transaction = successfulTransactions[0].transaction
           if (transaction.walletAmount > 0) {
             setWallet((prev) => ({
@@ -104,7 +95,7 @@ export default function BillingDashboard() {
       console.error("Error processing billing:", error)
       setBillingResult({
         success: false,
-        error: `Network error: ${error.message}`,
+        error: `Network error: ${error instanceof Error ? error.message : String(error)}`,
       })
     } finally {
       setLoading(false)
@@ -114,133 +105,159 @@ export default function BillingDashboard() {
   const paymentPreview = getPaymentPreview()
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Billing Dashboard</h1>
-        <Button onClick={() => window.location.reload()}>Refresh</Button>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Billing Dashboard</h1>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Wallet Balance */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${wallet.balance.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Available credits</p>
-          </CardContent>
-        </Card>
-
-        {/* Next Billing */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Billing</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{new Date(subscription.nextBillingDate).toLocaleDateString()}</div>
-            <p className="text-xs text-muted-foreground">${subscription.amount.toFixed(2)} due</p>
-          </CardContent>
-        </Card>
-
-        {/* Subscription Status */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Subscription</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <Badge variant={subscription.status === "active" ? "default" : "secondary"}>{subscription.status}</Badge>
+        {/* Top Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Wallet Balance */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-sm font-medium text-gray-700">Wallet Balance</h3>
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{subscription.planId}</p>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="text-2xl font-bold text-gray-900 mb-1">${wallet.balance.toFixed(2)}</div>
+            <p className="text-sm text-gray-500">Available credits</p>
+          </div>
 
-      {/* Payment Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <DollarSign className="h-5 w-5" />
-            <span>Next Payment Preview</span>
-          </CardTitle>
-          <CardDescription>How your next subscription payment will be processed</CardDescription>
-        </CardHeader>
-        <CardContent>
+          {/* Next Billing */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-sm font-medium text-gray-700">Next Billing</h3>
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 mb-1">01/02/2024</div>
+            <p className="text-sm text-gray-500">${subscription.amount.toFixed(2)} due</p>
+          </div>
+
+          {/* Subscription */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-sm font-medium text-gray-700">Subscription</h3>
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div className="mb-2">
+              <span className="inline-flex px-2 py-1 text-sm font-medium bg-gray-900 text-white rounded">
+                {subscription.status}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">{subscription.planId}</p>
+          </div>
+        </div>
+
+        {/* Payment Preview */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">$ Next Payment Preview</h2>
+            <p className="text-sm text-gray-600">How your next subscription payment will be processed</p>
+          </div>
+
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Payment Method:</span>
-              <Badge className={paymentPreview.color}>{paymentPreview.method}</Badge>
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-gray-900">Payment Method:</span>
+              <span className="inline-flex px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">
+                {paymentPreview.method}
+              </span>
             </div>
 
             {paymentPreview.walletAmount > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">From Wallet:</span>
-                <span className="font-medium">${paymentPreview.walletAmount.toFixed(2)}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">From Wallet:</span>
+                <span className="font-medium text-gray-900">${paymentPreview.walletAmount.toFixed(2)}</span>
               </div>
             )}
 
             {paymentPreview.paypalAmount > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">From PayPal:</span>
-                <span className="font-medium">${paymentPreview.paypalAmount.toFixed(2)}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">From PayPal:</span>
+                <span className="font-medium text-gray-900">${paymentPreview.paypalAmount.toFixed(2)}</span>
               </div>
             )}
 
-            <div className="border-t pt-2">
-              <div className="flex items-center justify-between font-bold">
-                <span>Total:</span>
-                <span>${subscription.amount.toFixed(2)}</span>
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold text-gray-900">Total:</span>
+                <span className="text-lg font-semibold text-gray-900">${subscription.amount.toFixed(2)}</span>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Billing Process */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Test Billing Process</CardTitle>
-          <CardDescription>Manually trigger the billing process for testing</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={runBillingProcess} className="w-full" disabled={loading}>
+        {/* Test Billing Process */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Test Billing Process</h2>
+            <p className="text-sm text-gray-600">Manually trigger the billing process for testing</p>
+          </div>
+
+          <button
+            onClick={runBillingProcess}
+            disabled={loading}
+            className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {loading ? "Processing..." : "Run Billing Process"}
-          </Button>
+          </button>
 
           {billingResult && (
-            <Card className={billingResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
-              <CardContent className="pt-4">
-                <div className="flex items-center space-x-2 mb-2">
+            <div className={`mt-4 p-4 rounded-lg border ${
+              billingResult.success 
+                ? "bg-green-50 border-green-200" 
+                : "bg-red-50 border-red-200"
+            }`}>
+              <div className="flex items-center space-x-2 mb-2">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  billingResult.success ? "bg-green-500" : "bg-red-500"
+                }`}>
                   {billingResult.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   ) : (
-                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
                   )}
-                  <span className={`font-medium ${billingResult.success ? "text-green-800" : "text-red-800"}`}>
-                    {billingResult.success ? "Billing Successful" : "Billing Failed"}
-                  </span>
                 </div>
+                <span className={`font-medium ${
+                  billingResult.success ? "text-green-800" : "text-red-800"
+                }`}>
+                  {billingResult.success ? "Billing Successful" : "Billing Failed"}
+                </span>
+              </div>
 
-                <p className={`text-sm ${billingResult.success ? "text-green-700" : "text-red-700"}`}>
-                  {billingResult.message || billingResult.error}
-                </p>
+              <p className={`text-sm ${
+                billingResult.success ? "text-green-700" : "text-red-700"
+              }`}>
+                {billingResult.message || billingResult.error}
+              </p>
 
-                {billingResult.success && billingResult.totalProcessed && (
-                  <div className="mt-2 text-sm text-green-700">
-                    <p>Total Processed: {billingResult.totalProcessed}</p>
-                    <p>Successful: {billingResult.successful}</p>
-                    <p>Failed: {billingResult.failed}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              {billingResult.success && billingResult.totalProcessed && (
+                <div className="mt-2 text-sm text-green-700">
+                  <p>Total Processed: {billingResult.totalProcessed}</p>
+                  <p>Successful: {billingResult.successful}</p>
+                  <p>Failed: {billingResult.failed}</p>
+                </div>
+              )}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
