@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "PayPal API error",
-        details: error.message,
+        details: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
       },
       {

@@ -26,7 +26,7 @@ export class BillingCron {
           console.log(`Billing successful for user ${userId}`)
         } catch (error) {
           console.error(`Billing failed for user ${userId}:`, error)
-          results.push({ userId, status: "failed", error: error.message })
+          results.push({ userId, status: "failed", error: error instanceof Error ? error.message : String(error) })
         }
       }
 
