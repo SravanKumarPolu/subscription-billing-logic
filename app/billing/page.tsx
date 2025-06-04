@@ -25,7 +25,7 @@ interface BillingResult {
 }
 
 export default function BillingDashboard() {
-  const [wallet, setWallet] = useState<WalletData>({ balance: 25.5, currency: "USD" })
+  const [wallet, setWallet] = useState<WalletData>({ balance: 55.5, currency: "USD" })
   const [subscription, setSubscription] = useState<SubscriptionData>({
     amount: 29.99,
     nextBillingDate: "2024-02-01",

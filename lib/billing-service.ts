@@ -5,7 +5,7 @@ export class BillingService {
   private mockWallet = {
     id: "wallet_user_123",
     userId: "user_123",
-    balance: 25.5,
+    balance: 55.5,
     currency: "USD",
     updatedAt: new Date(),
   }
@@ -73,7 +73,7 @@ export class BillingService {
         status: "failed",
         paymentMethod: "wallet",
         transactionDate: new Date(),
-        description: `Billing failed: ${error.message}`,
+        description: `Billing failed: ${error instanceof Error ? error.message : String(error)}`,
       }
     }
   }
@@ -147,7 +147,7 @@ export class BillingService {
         status: "failed",
         paymentMethod: "wallet_paypal",
         transactionDate: new Date(),
-        description: `Payment failed: ${error.message}`,
+        description: `Payment failed: ${error instanceof Error ? error.message : String(error)}`,
       }
     }
   }
@@ -190,7 +190,7 @@ export class BillingService {
         status: "failed",
         paymentMethod: "paypal",
         transactionDate: new Date(),
-        description: `PayPal payment failed: ${error.message}`,
+        description: `PayPal payment failed: ${error instanceof Error ? error.message : String(error)}`,
       }
     }
   }
