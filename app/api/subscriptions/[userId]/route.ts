@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { userId
   } catch (error) {
     console.error("Error updating subscription:", error)
     return NextResponse.json(
-      { error: "Failed to update subscription", details: error.message },
+      { error: "Failed to update subscription", details: (error as Error).message },
       {
         status: 500,
         headers: {

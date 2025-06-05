@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to fetch due subscriptions",
-        details: error.message,
+        details: (error as Error).message,
         timestamp: new Date().toISOString(),
       },
       {

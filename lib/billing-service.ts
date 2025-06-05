@@ -58,6 +58,12 @@ export class BillingService {
       }
 
       console.log("Transaction completed:", transaction)
+      
+      // Send success notification if transaction was successful
+      if (transaction.status === "success") {
+        await this.sendSuccessNotification(userId, transaction)
+      }
+      
       return transaction
     } catch (error) {
       console.error("Billing processing failed:", error)
@@ -214,6 +220,32 @@ export class BillingService {
     } catch (error) {
       console.error("Failed to get wallet, using mock data:", error)
       return this.mockWallet
+    }
+  }
+
+  private async sendSuccessNotification(userId: string, transaction: BillingTransaction): Promise<void> {
+    try {
+      console.log(`Sending success notification to user ${userId}`)
+      
+      const response = await fetch("/api/notifications/billing-success", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          transaction,
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log("Success notification sent:", result.customerMessage)
+      } else {
+        console.error("Failed to send success notification:", response.statusText)
+      }
+    } catch (error) {
+      console.error("Error sending success notification:", error)
     }
   }
 }

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Transaction creation error:", error)
     return NextResponse.json(
-      { error: "Failed to create transaction", details: error.message },
+      { error: "Failed to create transaction", details: (error as Error).message },
       {
         status: 500,
         headers: {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Failed to fetch transactions:", error)
     return NextResponse.json(
-      { error: "Failed to fetch transactions", details: error.message },
+      { error: "Failed to fetch transactions", details: (error as Error).message },
       {
         status: 500,
         headers: {

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useToast } from "@/hooks/useToast"
+import { ToastContainer } from "@/components/Toast"
 
 interface WalletData {
   balance: number
@@ -22,6 +24,7 @@ interface BillingResult {
   totalProcessed?: number
   successful?: number
   failed?: number
+  customerMessage?: string
 }
 
 export default function BillingDashboard() {
@@ -34,6 +37,7 @@ export default function BillingDashboard() {
   })
   const [loading, setLoading] = useState(false)
   const [billingResult, setBillingResult] = useState<BillingResult | null>(null)
+  const { toasts, removeToast, showSuccess, showError } = useToast()
 
   const getPaymentPreview = () => {
     const subscriptionAmount = subscription.amount
@@ -80,6 +84,13 @@ export default function BillingDashboard() {
       setBillingResult(result)
 
       if (result.success) {
+        // Show success toast with customer message
+        if (result.customerMessage) {
+          showSuccess(`Your subscription has been renewed successfully!\n\nAmount: $${subscription.amount.toFixed(2)}\nThank you for being a valued customer!`)
+        } else {
+          showSuccess("Billing processed successfully!")
+        }
+        
         const successfulTransactions = result.results?.filter((r: any) => r.status === "success") || []
         if (successfulTransactions.length > 0) {
           const transaction = successfulTransactions[0].transaction
@@ -90,9 +101,13 @@ export default function BillingDashboard() {
             }))
           }
         }
+      } else {
+        // Show error toast
+        showError(result.error || "Billing failed. Please try again.")
       }
     } catch (error) {
       console.error("Error processing billing:", error)
+      showError("Network error occurred. Please check your connection and try again.")
       setBillingResult({
         success: false,
         error: `Network error: ${error instanceof Error ? error.message : String(error)}`,
@@ -106,6 +121,7 @@ export default function BillingDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -246,6 +262,15 @@ export default function BillingDashboard() {
               }`}>
                 {billingResult.message || billingResult.error}
               </p>
+
+              {billingResult.success && billingResult.customerMessage && (
+                <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg">
+                  <h4 className="font-semibold text-green-800 mb-2">📧 Customer Notification:</h4>
+                  <pre className="text-sm text-green-700 whitespace-pre-wrap font-sans">
+                    {billingResult.customerMessage}
+                  </pre>
+                </div>
+              )}
 
               {billingResult.success && billingResult.totalProcessed && (
                 <div className="mt-2 text-sm text-green-700">
