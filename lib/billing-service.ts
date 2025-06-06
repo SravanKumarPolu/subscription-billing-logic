@@ -1,6 +1,12 @@
 import type { BillingTransaction, Subscription, Wallet } from "./types"
+import { PayPalService } from "./paypal-service"
+import { StripeService } from "./stripe-service"
 
 export class BillingService {
+  private paypalService: PayPalService
+  private stripeService: StripeService
+  private isTestMode: boolean
+
   // Mock data as fallbacks
   private mockWallet = {
     id: "wallet_user_123",
@@ -24,7 +30,13 @@ export class BillingService {
     updatedAt: new Date(),
   }
 
-  async processMonthlyBilling(userId: string): Promise<BillingTransaction> {
+  constructor() {
+    this.paypalService = new PayPalService()
+    this.stripeService = new StripeService()
+    this.isTestMode = process.env.TEST_MODE === 'true' || process.env.NODE_ENV !== 'production'
+  }
+
+  async processMonthlyBilling(userId: string, preferredPaymentMethod: 'paypal' | 'stripe' = 'paypal'): Promise<BillingTransaction> {
     try {
       console.log(`Processing billing for user: ${userId}`)
 
@@ -48,13 +60,17 @@ export class BillingService {
         console.log("Processing wallet-only payment")
         transaction = await this.processWalletPayment(userId, subscription.id, subscriptionAmount)
       } else if (walletBalance > 0) {
-        // Partial wallet + PayPal
-        console.log("Processing hybrid payment (wallet + PayPal)")
-        transaction = await this.processHybridPayment(userId, subscription.id, subscriptionAmount, walletBalance)
+        // Partial wallet + external payment method
+        console.log(`Processing hybrid payment (wallet + ${preferredPaymentMethod})`)
+        transaction = await this.processHybridPayment(userId, subscription.id, subscriptionAmount, walletBalance, preferredPaymentMethod)
       } else {
-        // Full PayPal payment
-        console.log("Processing PayPal-only payment")
-        transaction = await this.processPayPalPayment(userId, subscription.id, subscriptionAmount)
+        // Full external payment method
+        console.log(`Processing ${preferredPaymentMethod}-only payment`)
+        if (preferredPaymentMethod === 'stripe') {
+          transaction = await this.processStripePayment(userId, subscription.id, subscriptionAmount)
+        } else {
+          transaction = await this.processPayPalPayment(userId, subscription.id, subscriptionAmount)
+        }
       }
 
       console.log("Transaction completed:", transaction)
@@ -114,18 +130,33 @@ export class BillingService {
     subscriptionId: string,
     totalAmount: number,
     walletAmount: number,
+    preferredPaymentMethod: 'paypal' | 'stripe' = 'paypal',
   ): Promise<BillingTransaction> {
-    const paypalAmount = totalAmount - walletAmount
+    const externalAmount = totalAmount - walletAmount
 
     try {
-      // Simulate PayPal charge
-      const paypalSuccess = Math.random() > 0.1 // 90% success rate
+      console.log(`🧪 Processing hybrid payment: $${walletAmount} wallet + $${externalAmount} ${preferredPaymentMethod}`)
 
-      if (paypalSuccess) {
-        console.log(`PayPal charge successful: $${paypalAmount}`)
+      let externalResult: any
+      let transactionId: string
+
+      if (preferredPaymentMethod === 'stripe') {
+        // Use Stripe service
+        externalResult = await this.stripeService.chargeCustomer(externalAmount, 'usd')
+        transactionId = externalResult.id || `STRIPE_TEST_${Date.now()}`
+      } else {
+        // Use PayPal service  
+        externalResult = await this.paypalService.chargeCustomer(externalAmount, 'USD')
+        transactionId = externalResult.id || `PAYPAL_TEST_${Date.now()}`
+      }
+      
+      if (externalResult.status === 'COMPLETED' || externalResult.test_mode || externalResult.succeeded) {
+        console.log(`✅ ${preferredPaymentMethod} charge successful: $${externalAmount}`)
 
         // Update mock wallet balance
         this.mockWallet.balance = 0
+
+        const paymentMethodType = preferredPaymentMethod === 'stripe' ? 'wallet_stripe' : 'wallet_paypal'
 
         return {
           id: `txn_hybrid_${Date.now()}`,
@@ -133,16 +164,23 @@ export class BillingService {
           subscriptionId,
           amount: totalAmount,
           walletAmount,
-          paypalAmount,
+          paypalAmount: preferredPaymentMethod === 'paypal' ? externalAmount : 0,
+          stripeAmount: preferredPaymentMethod === 'stripe' ? externalAmount : 0,
           status: "success",
-          paymentMethod: "wallet_paypal",
+          paymentMethod: paymentMethodType,
           transactionDate: new Date(),
-          description: `Subscription payment: $${walletAmount.toFixed(2)} wallet + $${paypalAmount.toFixed(2)} PayPal`,
+          description: `Subscription payment: $${walletAmount.toFixed(2)} wallet + $${externalAmount.toFixed(2)} ${preferredPaymentMethod}${this.isTestMode ? ' (TEST)' : ''}`,
+          testMode: this.isTestMode,
+          ...(preferredPaymentMethod === 'stripe' 
+            ? { stripePaymentIntentId: transactionId }
+            : { paypalTransactionId: transactionId }
+          ),
         }
       } else {
-        throw new Error("PayPal payment declined")
+        throw new Error(`${preferredPaymentMethod} payment not completed`)
       }
     } catch (error) {
+      console.error(`❌ Hybrid payment failed:`, error)
       return {
         id: `txn_hybrid_failed_${Date.now()}`,
         userId,
@@ -151,9 +189,10 @@ export class BillingService {
         walletAmount: 0,
         paypalAmount: 0,
         status: "failed",
-        paymentMethod: "wallet_paypal",
+        paymentMethod: preferredPaymentMethod === 'stripe' ? 'wallet_stripe' : 'wallet_paypal',
         transactionDate: new Date(),
-        description: `Payment failed: ${error instanceof Error ? error.message : String(error)}`,
+        description: `Payment failed: ${error instanceof Error ? error.message : String(error)}${this.isTestMode ? ' (TEST)' : ''}`,
+        testMode: this.isTestMode,
       }
     }
   }
@@ -164,11 +203,13 @@ export class BillingService {
     amount: number,
   ): Promise<BillingTransaction> {
     try {
-      // Simulate PayPal charge
-      const paypalSuccess = Math.random() > 0.1 // 90% success rate
+      console.log(`🧪 Processing PayPal payment: $${amount}`)
 
-      if (paypalSuccess) {
-        console.log(`PayPal charge successful: $${amount}`)
+      // Use PayPal service for testing/production
+      const paypalResult = await this.paypalService.chargeCustomer(amount, 'USD')
+
+      if (paypalResult.status === 'COMPLETED' || paypalResult.test_mode) {
+        console.log(`✅ PayPal charge successful: $${amount}`)
 
         return {
           id: `txn_paypal_${Date.now()}`,
@@ -180,12 +221,15 @@ export class BillingService {
           status: "success",
           paymentMethod: "paypal",
           transactionDate: new Date(),
-          description: "Subscription payment via PayPal",
+          description: `Subscription payment via PayPal${this.isTestMode ? ' (TEST)' : ''}`,
+          testMode: this.isTestMode,
+          paypalTransactionId: paypalResult.id,
         }
       } else {
-        throw new Error("PayPal payment declined")
+        throw new Error("PayPal payment not completed")
       }
     } catch (error) {
+      console.error('❌ PayPal payment failed:', error)
       return {
         id: `txn_paypal_failed_${Date.now()}`,
         userId,
@@ -196,8 +240,68 @@ export class BillingService {
         status: "failed",
         paymentMethod: "paypal",
         transactionDate: new Date(),
-        description: `PayPal payment failed: ${error instanceof Error ? error.message : String(error)}`,
+        description: `PayPal payment failed: ${error instanceof Error ? error.message : String(error)}${this.isTestMode ? ' (TEST)' : ''}`,
+        testMode: this.isTestMode,
       }
+    }
+  }
+
+  // New method for Stripe payments
+  async processStripePayment(
+    userId: string,
+    subscriptionId: string,
+    amount: number,
+    paymentMethodId?: string,
+  ): Promise<BillingTransaction> {
+    try {
+      console.log(`🧪 Processing Stripe payment: $${amount}`)
+
+      const stripeResult = await this.stripeService.chargeCustomer(amount, 'usd', paymentMethodId)
+
+      if (stripeResult.status === 'succeeded' || stripeResult.test_mode) {
+        console.log(`✅ Stripe charge successful: $${amount}`)
+
+        return {
+          id: `txn_stripe_${Date.now()}`,
+          userId,
+          subscriptionId,
+          amount,
+          walletAmount: 0,
+          paypalAmount: 0,
+          status: "success",
+          paymentMethod: "stripe",
+          transactionDate: new Date(),
+          description: `Subscription payment via Stripe${this.isTestMode ? ' (TEST)' : ''}`,
+          testMode: this.isTestMode,
+          stripePaymentIntentId: stripeResult.id,
+        }
+      } else {
+        throw new Error("Stripe payment not successful")
+      }
+    } catch (error) {
+      console.error('❌ Stripe payment failed:', error)
+      return {
+        id: `txn_stripe_failed_${Date.now()}`,
+        userId,
+        subscriptionId,
+        amount,
+        walletAmount: 0,
+        paypalAmount: 0,
+        status: "failed",
+        paymentMethod: "stripe",
+        transactionDate: new Date(),
+        description: `Stripe payment failed: ${error instanceof Error ? error.message : String(error)}${this.isTestMode ? ' (TEST)' : ''}`,
+        testMode: this.isTestMode,
+      }
+    }
+  }
+
+  // Get test credentials for both services
+  getTestCredentials() {
+    return {
+      paypal: this.paypalService.getTestCredentials(),
+      stripe: this.stripeService.getTestCredentials(),
+      isTestMode: this.isTestMode,
     }
   }
 
@@ -227,7 +331,8 @@ export class BillingService {
     try {
       console.log(`Sending success notification to user ${userId}`)
       
-      const response = await fetch("/api/notifications/billing-success", {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const response = await fetch(`${baseUrl}/api/notifications/billing-success`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

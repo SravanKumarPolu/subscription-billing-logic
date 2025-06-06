@@ -7,7 +7,7 @@ export class BillingCron {
     this.billingService = new BillingService()
   }
 
-  async processAllSubscriptions() {
+  async processAllSubscriptions(preferredPaymentMethod: 'paypal' | 'stripe' = 'paypal') {
     try {
       console.log("Starting monthly billing process...")
 
@@ -20,7 +20,7 @@ export class BillingCron {
       for (const userId of usersDue) {
         try {
           console.log(`Processing billing for user: ${userId}`)
-          const transaction = await this.billingService.processMonthlyBilling(userId)
+          const transaction = await this.billingService.processMonthlyBilling(userId, preferredPaymentMethod)
           results.push({ userId, status: "success", transaction })
 
           console.log(`Billing successful for user ${userId}`)

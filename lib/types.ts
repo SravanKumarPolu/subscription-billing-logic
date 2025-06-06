@@ -35,10 +35,14 @@ export interface BillingTransaction {
   amount: number
   walletAmount: number
   paypalAmount: number
+  stripeAmount?: number
   status: "success" | "failed" | "pending"
-  paymentMethod: "wallet" | "paypal" | "wallet_paypal"
+  paymentMethod: "wallet" | "paypal" | "wallet_paypal" | "stripe" | "wallet_stripe"
   transactionDate: Date
   description: string
+  testMode?: boolean
+  paypalTransactionId?: string
+  stripePaymentIntentId?: string
 }
 
 export interface Plan {

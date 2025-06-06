@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/Toast"
+import TestCredentials from "@/components/TestCredentials"
 
 interface WalletData {
   balance: number
@@ -37,6 +38,7 @@ export default function HomePage() {
   })
   const [loading, setLoading] = useState(false)
   const [billingResult, setBillingResult] = useState<BillingResult | null>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'paypal' | 'stripe'>('paypal')
   const { toasts, removeToast, showSuccess, showError } = useToast()
 
   const getPaymentPreview = () => {
@@ -47,19 +49,22 @@ export default function HomePage() {
       return {
         method: "Wallet Only",
         walletAmount: subscriptionAmount,
-        paypalAmount: 0,
+        externalAmount: 0,
+        externalMethod: selectedPaymentMethod,
       }
     } else if (walletBalance > 0) {
       return {
-        method: "Wallet + PayPal",
+        method: `Wallet + ${selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1)}`,
         walletAmount: walletBalance,
-        paypalAmount: subscriptionAmount - walletBalance,
+        externalAmount: subscriptionAmount - walletBalance,
+        externalMethod: selectedPaymentMethod,
       }
     } else {
       return {
-        method: "PayPal Only",
+        method: `${selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1)} Only`,
         walletAmount: 0,
-        paypalAmount: subscriptionAmount,
+        externalAmount: subscriptionAmount,
+        externalMethod: selectedPaymentMethod,
       }
     }
   }
@@ -69,13 +74,16 @@ export default function HomePage() {
       setLoading(true)
       setBillingResult(null)
 
-      console.log("Starting billing process...")
+      console.log(`Starting billing process with ${selectedPaymentMethod}...`)
 
       const response = await fetch("/api/billing/process", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          preferredPaymentMethod: selectedPaymentMethod
+        }),
       })
 
       const result = await response.json()
@@ -86,9 +94,9 @@ export default function HomePage() {
       if (result.success) {
         // Show success toast with customer message
         if (result.customerMessage) {
-          showSuccess(`Your subscription has been renewed successfully!\n\nAmount: $${subscription.amount.toFixed(2)}\nThank you for being a valued customer!`)
+          showSuccess(`Your subscription has been renewed successfully!\n\nAmount: $${subscription.amount.toFixed(2)}\nPayment Method: ${selectedPaymentMethod}\nThank you for being a valued customer!`)
         } else {
-          showSuccess("Billing processed successfully!")
+          showSuccess(`Billing processed successfully via ${selectedPaymentMethod}!`)
         }
         
         const successfulTransactions = result.results?.filter((r: any) => r.status === "success") || []
@@ -133,6 +141,9 @@ export default function HomePage() {
             Refresh
           </button>
         </div>
+
+        {/* Test Credentials */}
+        <TestCredentials />
 
         {/* Top Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -184,6 +195,52 @@ export default function HomePage() {
             <p className="text-sm text-gray-600">How your next subscription payment will be processed</p>
           </div>
 
+          {/* Payment Method Selector */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Choose Payment Method for External Payments
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSelectedPaymentMethod('paypal')}
+                className={`p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                  selectedPaymentMethod === 'paypal'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">P</span>
+                </div>
+                <span className="font-medium">PayPal</span>
+                {selectedPaymentMethod === 'paypal' && (
+                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setSelectedPaymentMethod('stripe')}
+                className={`p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                  selectedPaymentMethod === 'stripe'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">S</span>
+                </div>
+                <span className="font-medium">Stripe</span>
+                {selectedPaymentMethod === 'stripe' && (
+                  <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="font-medium text-gray-900">Payment Method:</span>
@@ -199,10 +256,10 @@ export default function HomePage() {
               </div>
             )}
 
-            {paymentPreview.paypalAmount > 0 && (
+            {paymentPreview.externalAmount > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">From PayPal:</span>
-                <span className="font-medium text-gray-900">${paymentPreview.paypalAmount.toFixed(2)}</span>
+                <span className="text-gray-600">From {selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1)}:</span>
+                <span className="font-medium text-gray-900">${paymentPreview.externalAmount.toFixed(2)}</span>
               </div>
             )}
 
@@ -215,23 +272,41 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Test Billing Process */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Test Billing Process</h2>
-            <p className="text-sm text-gray-600">Manually trigger the billing process for testing</p>
+        {/* Run Billing Process - Main Action */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">💰 Subscription Billing</h2>
+            <p className="text-gray-600">Process all pending subscription payments automatically</p>
           </div>
 
-          <button
-            onClick={runBillingProcess}
-            disabled={loading}
-            className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Processing..." : "Run Billing Process"}
-          </button>
+          <div className="flex justify-center">
+            <button
+              onClick={runBillingProcess}
+              disabled={loading}
+              className="bg-gradient-to-r from-gray-900 to-gray-700 text-white py-4 px-8 rounded-lg font-bold text-lg hover:from-gray-800 hover:to-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg min-w-[300px]"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  <span>Processing Payments...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                  <span>Run Billing Process</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-4 text-center text-sm text-gray-500">
+            <p>Automatically processes payments using wallet balance first, then {selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1)}</p>
+          </div>
 
           {billingResult && (
-            <div className={`mt-4 p-4 rounded-lg border ${
+            <div className={`mt-6 p-4 rounded-lg border ${
               billingResult.success 
                 ? "bg-green-50 border-green-200" 
                 : "bg-red-50 border-red-200"
